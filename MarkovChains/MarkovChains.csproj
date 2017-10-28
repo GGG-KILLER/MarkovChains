@@ -2,6 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <CodeAnalysisRuleSet>ruleset.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
-
 </Project>

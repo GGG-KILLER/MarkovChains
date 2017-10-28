@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarkovChains", "MarkovChains\MarkovChains.csproj", "{1CC085F0-93E1-404C-B687-C5731DBF83C1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MarkovChains", "MarkovChains\MarkovChains.csproj", "{1CC085F0-93E1-404C-B687-C5731DBF83C1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarkovConsole", "MarkovConsole\MarkovConsole.csproj", "{FA66DD50-3601-4809-970B-58AACE865D92}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MarkovConsole", "MarkovConsole\MarkovConsole.csproj", "{FA66DD50-3601-4809-970B-58AACE865D92}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
