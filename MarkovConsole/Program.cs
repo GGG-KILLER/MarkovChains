@@ -17,7 +17,6 @@ namespace MarkovConsole
 				var firstSpace = line.IndexOf ( ' ' );
 				var cmd = line.Substring ( 0, firstSpace != -1 ? firstSpace : line.Length );
 				var data = firstSpace != -1 ? line.Substring ( firstSpace + 1 ) : "";
-				WordNode word;
 
 				switch ( cmd )
 				{
@@ -26,85 +25,40 @@ namespace MarkovConsole
 						break;
 
 					case "learnfile":
-						chain = null;
+						if ( !File.Exists ( data.Trim ( ) ) )
+						{
+							Console.WriteLine ( "File does not exist." );
+							return;
+						}
+
 						chain = new MarkovChain ( );
 						foreach ( String fline in File.ReadAllLines ( data.Trim ( ) ) )
+						{
+							Console.WriteLine ( $"Learning {fline}" );
 							chain.Learn ( fline );
+						}
 						break;
 
 					case "generate":
 						try
 						{
-							if ( data == "" )
+							var idx = data.IndexOf ( ' ' );
+							if ( idx != -1 )
 							{
-								foreach ( var sword in chain.Generate ( ) )
-									Console.Write ( sword + " " );
-								Console.WriteLine ( );
+								var sdepth = data.Substring ( 0, idx ).Trim ( );
+								var start = data.Substring ( idx + 1 ).Trim ( );
+								if ( Int32.TryParse ( sdepth, out Int32 depth ) )
+								{
+									Console.WriteLine ( chain.Generate ( start, depth, Int32.MaxValue ) );
+								}
+								else if ( data.Trim ( ) != "" )
+								{
+									Console.WriteLine ( chain.Generate ( data, 2, Int32.MaxValue ) );
+								}
 							}
 							else
 							{
-								String[] parts = data.Split(new[]{' '});
-								var firstWord = parts[0];
-								var length = Int32.Parse ( parts[1] );
-								foreach ( var sword in chain.Generate ( firstWord, length ) )
-									Console.Write ( sword + " " );
-								Console.WriteLine ( );
-							}
-						}
-						catch ( Exception e )
-						{
-							Console.WriteLine ( e );
-						}
-						break;
-
-					case "wordinfo":
-						word = chain.GetWord ( data.Trim ( ) );
-						Console.WriteLine ( $@"Word info for {word.Word}:
-	Frequence: {word.Count}" );
-						break;
-
-					case "counts":
-						Console.WriteLine ( "Counts:" );
-						foreach ( WordNode sword in chain.Words.OrderBy ( w => w.Count ) )
-							Console.WriteLine ( $"\t{sword.Word.PadRight ( 50, ' ' )}: {sword.Count}" );
-						break;
-
-					case "prob":
-						word = chain.GetWord ( data.Trim ( ) );
-						Console.WriteLine ( $"Probability of seeing {word.Word}:" );
-
-						var tot = chain.Words.Sum ( w => w.Count );
-						Console.WriteLine ( $"\tAs first word: {( ( Double ) word.Count / tot ) * 100}" );
-
-						foreach ( WordNode sword in chain.Words )
-							if ( sword.NextWords.Contains ( word ) )
-								Console.WriteLine ( $"\tAfter {sword.Word}: {( ( Double ) word.Count / sword.NextWords.Sum ( w => w.Count ) ) * 100}" );
-						break;
-
-					case "save":
-						try
-						{
-							using ( FileStream speed = File.OpenWrite ( $"{data}.speed.mk" ) )
-							using ( FileStream space = File.OpenWrite ( $"{data}.space.mk" ) )
-							{
-								var serializer = new MarkovSerializer ( );
-								serializer.SerializeForSpeed ( chain, speed );
-								serializer.SerializeForSpace ( chain, space );
-							}
-						}
-						catch ( Exception e )
-						{
-							Console.WriteLine ( e );
-						}
-						break;
-
-					case "load":
-						try
-						{
-							using ( FileStream file = File.OpenRead ( data ) )
-							{
-								var deserializer = new MarkovDeserializer ( );
-								chain = deserializer.Deserialize ( file );
+								Console.WriteLine ( chain.Generate ( ) );
 							}
 						}
 						catch ( Exception e )

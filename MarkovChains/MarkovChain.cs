@@ -4,120 +4,163 @@ using System.Linq;
 
 namespace MarkovChains
 {
-	public class WordNode
-	{
-		public String Word;
-		public IList<WordNode> NextWords;
-		public Int32 Count;
-	}
-
 	public class MarkovChain
 	{
-		private readonly Dictionary<String, WordNode> WordList = new Dictionary<String, WordNode> ( );
-		public WordNode[] Words => this.WordList.Values.ToArray ( );
+		internal readonly Dictionary<String, List<String[]>> Memory = new Dictionary<String, List<String[]>> ( );
+		private readonly Random rand = new Random ( );
 
-		public WordNode GetWord ( String word )
-		{
-			// Returns word if it exist otherwise create and
-			// return it
-			return this.WordList.ContainsKey ( word ) ?
-				this.WordList[word] :
-				this.WordList[word] = new WordNode
-				{
-					Word = word,
-					NextWords = new List<WordNode> ( ),
-					Count = 0
-				};
-		}
+		public IEnumerable<String> Words => this.Memory.Keys.AsEnumerable ( );
 
 		public void Learn ( String sentence )
 		{
-			String[] words = sentence.Split ( new[] { ' ' } );
-			for ( var i = 0 ; i < words.Length - 1 ; i++ )
+			IEnumerable<String> words = sentence.Split ( new[] { ' ' } );
+			while ( words.Count ( ) > 2 )
 			{
-				WordNode word = GetWord ( words[i] ),
-					next = GetWord ( words[i + 1] );
-				word.Count++;
-				next.Count++;
+				String first = words.First ( );
+				String[] sent = words.Skip ( 1 ).ToArray ( );
+				words = sent;
 
-				if ( !word.NextWords.Contains ( next ) )
-					word.NextWords.Add ( next );
+				if ( !this.Memory.ContainsKey ( first ) )
+					this.Memory[first] = new List<String[]> ( );
+				this.Memory[first].Add ( sent );
 			}
 		}
 
-		public void Forget ( String wordstr )
+		private String[] PickNextSentencePiece ( String Current )
 		{
-			WordNode word = this.GetWord ( wordstr );
-			foreach ( WordNode Word in this.Words )
-				Word.NextWords.Remove ( word );
-			word.NextWords.Clear ( );
-			this.WordList.Remove ( wordstr );
+			List<String[]> cand;
+
+			// If there isn't a word to start from, then pick a
+			// random one and get the sentence list of it
+			if ( Current == null )
+			{
+				List<String[]>[] candidates = this.Memory.Values.ToArray ( );
+				lock ( this.rand )
+					cand = candidates[this.rand.Next ( candidates.Length )];
+			}
+			// Otherwise pick the sentence piece list from the word
+			else if ( this.Memory.ContainsKey ( Current ) )
+			{
+				cand = this.Memory[Current];
+			}
+			else
+			{
+				return null;
+			}
+
+			// Then pick a random sentence piece to use
+			lock ( this.rand )
+			{
+				return cand[this.rand.Next ( cand.Count )];
+			}
+		}
+
+		private String[] GetSentencePieceFromWords ( String[] words, Int32 depth )
+		{
+			if ( words.Length > depth )
+				words = words.Skip ( words.Length - depth ).ToArray ( );
+
+			if ( words.Length > 1 )
+			{
+				List<String[]> pieces = this.Memory[words[0]];
+				words = words.Skip ( 1 ).ToArray ( );
+
+				foreach ( String[] piece in pieces )
+				{
+					if ( piece.Length < words.Length )
+						continue;
+
+					for ( var i = 0 ; i < words.Length ; i++ )
+						if ( words[i] != piece[i] )
+							goto end;
+
+					return piece;
+
+					end:;
+				}
+
+				return null;
+			}
+			else
+			{
+				return PickNextSentencePiece ( words[0] );
+			}
 		}
 
 		#region Generating
 
-		/// <summary>
-		/// Generate a random word chain using a random intial
-		/// word (based on occurrence) and a maximum length of 40
-		/// </summary>
-		/// <returns></returns>
-		public IEnumerable<String> Generate ( )
+		public String Generate ( )
 		{
-			WordNode[] words = this.WordList.Values.ToArray ( );
-			Int32 counts = words.Sum ( w => w.Count ),
-				acc = 0,
-				rnd = new Random ( ).Next ( 0, counts );
-
-			WordNode word = words[0];
-			foreach ( WordNode cword in words )
-			{
-				word = cword;
-				acc += cword.Count;
-				if ( acc >= rnd )
-					break;
-			}
-
-			return Generate ( word.Word, Int32.MaxValue );
+			return Generate ( PickNextSentencePiece ( null )[0] );
 		}
 
-		public IEnumerable<String> Generate ( String firstWord )
+		public String Generate ( String start )
 		{
-			return Generate ( firstWord, 40 );
+			return Generate ( start, 2 );
 		}
 
-		public IEnumerable<String> Generate ( String firstWord, Int32 wordCount )
+		public String Generate ( String start, Int32 depth )
 		{
-			var count = 0;
-			// Each generator uses it's own random instance for
-			// thread safety and speed since lock would make it slower
-			var rand = new Random ( );
-			WordNode current = this.GetWord ( firstWord );
+			return Generate ( start, depth, 40 );
+		}
 
-			// Return the first word
-			yield return current.Word;
+		public String Generate ( String start, Int32 depth, Int32 maxLength )
+		{
+			var len = 0;
+			var lastword = start;
 
-			// TODO: fix length being ignored when the same word
-			//       is used twice or more times in a row
-			while ( ++count < wordCount )
+			// initialize with the first word in
+			var sentence = new List<String> ( );
+
+			// Handle starting sentences
+			if ( start.Contains ( ' ' ) )
 			{
-				if ( this.WordList.ContainsKey ( current.Word ) && current.NextWords.Count > 0 )
+				// Add all words of the starting sentence from this
+				String[] words = start.Split ( new[] { ' ' } );
+				sentence.AddRange ( words );
+
+				String[] piece = GetSentencePieceFromWords ( words, depth );
+				// Generate the first part only if there is any
+				// known sentences with this sub-sentence
+				if ( piece != null )
 				{
-					Int32 rn = rand.Next ( 0, current.NextWords.Sum ( word => word.Count ) ),
-						acc = 0;
-
-					foreach ( WordNode word in current.NextWords )
+					for ( var i = 0 ; i < depth && len < maxLength ; i++ )
 					{
-						acc += word.Count;
-						current = word;
-						if ( acc >= rn )
-							break;
+						sentence.Add ( piece[i] );
+						start = piece[i];
+						len++;
 					}
-
-					yield return current.Word;
 				}
+				// Otherwise just return what the user typed
 				else
-					break;
+				{
+					return String.Join ( " ", sentence );
+				}
 			}
+			else
+			{
+				sentence.Add ( start );
+			}
+
+			// Keep generating while we haven't hit the maximum length
+			while ( len < maxLength )
+			{
+				// Pick next sentence piece
+				String[] piece = this.PickNextSentencePiece ( lastword );
+
+				// If it was a terminator word, just quit
+				if ( piece == null )
+					break;
+
+				// Otherwise continue generating the sentence
+				for ( var curdepth = 0 ; curdepth < depth && len < maxLength && curdepth < piece.Length ; curdepth++ )
+				{
+					sentence.Add ( piece[curdepth] );
+					lastword = piece[curdepth];
+					len++;
+				}
+			}
+			return String.Join ( " ", sentence );
 		}
 
 		#endregion Generating
@@ -125,15 +168,13 @@ namespace MarkovChains
 		public void DebugPrint ( )
 		{
 			Console.WriteLine ( '{' );
-			foreach ( KeyValuePair<String, WordNode> wordPair in this.WordList )
+			foreach ( KeyValuePair<String, List<String[]>> kv in this.Memory )
 			{
-				Console.WriteLine ( "\t" + wordPair.Key );
-				Console.WriteLine ( "\t{" );
-				foreach ( WordNode next in wordPair.Value.NextWords )
-				{
-					Console.WriteLine ( "\t\t" + next.Word );
-				}
-				Console.WriteLine ( "\t}" );
+				Console.WriteLine ( kv.Key );
+				Console.WriteLine ( "{" );
+				foreach ( String[] sentence in kv.Value )
+					Console.WriteLine ( $"\t{String.Join ( " ", sentence )}" );
+				Console.WriteLine ( "}" );
 			}
 			Console.WriteLine ( '}' );
 		}
