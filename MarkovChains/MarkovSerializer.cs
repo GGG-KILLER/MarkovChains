@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -6,64 +7,42 @@ namespace MarkovChains
 {
 	public class MarkovSerializer
 	{
-		protected void WriteHeader ( BinaryWriter bw, String type )
+		protected void WriteHeader ( BinaryWriter bw)
 		{
 			// Magic number
 			bw.Write ( "MARKOV" );
 
-			// Save file type
-			bw.Write ( type );
-
 			// Write file version (yes, 3rd iteration)
-			bw.Write ( 3 );
+			bw.Write ( 4 );
 		}
 
-		public void SerializeForSpeed ( MarkovChain chain, Stream stream )
+		public void Serialize ( MarkovChain chain, Stream stream )
 		{
-			WordNode[] words = chain.Words;
+			Dictionary<String, List<String[]>> mem = chain.Memory;
 			using ( var bw = new BinaryWriter ( stream, Encoding.UTF8, true ) )
 			{
 				// Write the header
-				WriteHeader ( bw, "SPEED" );
+				WriteHeader ( bw );
 
 				// Write amount of words
-				bw.Write ( words.Length );
-				foreach ( WordNode word in words )
+				bw.Write ( mem.Count );
+				foreach ( KeyValuePair<String, List<String[]>> kv in mem )
 				{
-					// Serialize node base info
-					bw.Write ( word.Word );
-					bw.Write ( word.Count );
+					// Serialize base row
+					bw.Write ( kv.Key );
+					List<String[]> sentences = kv.Value;
+					bw.Write ( sentences.Count );
 
 					// Serialize possible next words (count not
 					// needed as they'll appear in the root scope too)
-					bw.Write ( word.NextWords.Count );
-					foreach ( WordNode next in word.NextWords )
-						bw.Write ( next.Word );
-				}
-			}
-		}
-
-		public void SerializeForSpace ( MarkovChain chain, Stream stream )
-		{
-			WordNode[] words = chain.Words;
-			using ( var bw = new BinaryWriter ( stream, Encoding.UTF8, true ) )
-			{
-				// Write the header
-				WriteHeader ( bw, "SPACE" );
-
-				// Write amount of words
-				bw.Write ( words.Length );
-				foreach ( WordNode word in words )
-				{
-					// Serialize node base info
-					bw.Write ( word.Word );
-					bw.Write ( word.Count );
-
-					// Serialize possible next words using only
-					// their indexes to save space
-					bw.Write ( word.NextWords.Count );
-					foreach ( WordNode next in word.NextWords )
-						bw.Write ( Array.IndexOf ( words, next ) );
+					bw.Write ( sentences.Count );
+					foreach ( String[] sentence in sentences )
+					{
+						// Write the sentence word array
+						bw.Write ( sentence.Length );
+						foreach ( var word in sentence )
+							bw.Write ( word );
+					}
 				}
 			}
 		}
