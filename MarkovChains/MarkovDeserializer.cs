@@ -40,7 +40,7 @@ namespace MarkovChains
 				{
 					var key = br.ReadString ( );
 					var sentencecount = br.ReadInt32 ( );
-					chain.Memory[key] = new List<String[]> ( sentencecount );
+					chain.SubSentences[key] = new List<String[]> ( sentencecount );
 
 					while ( sentencecount-- > 0 )
 					{
@@ -49,7 +49,7 @@ namespace MarkovChains
 						for ( var i = 0 ; i < sentencelength ; i++ )
 							sentence[i] = br.ReadString ( );
 
-						chain.Memory[key].Add ( sentence );
+						chain.SubSentences[key].Add ( sentence );
 					}
 				}
 

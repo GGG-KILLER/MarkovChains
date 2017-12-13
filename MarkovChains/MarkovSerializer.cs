@@ -18,7 +18,7 @@ namespace MarkovChains
 
 		public void Serialize ( MarkovChain chain, Stream stream )
 		{
-			Dictionary<String, List<String[]>> mem = chain.Memory;
+			Dictionary<String, List<String[]>> mem = chain.SubSentences;
 			using ( var bw = new BinaryWriter ( stream, Encoding.UTF8, true ) )
 			{
 				// Write the header
