@@ -5,7 +5,7 @@ using System.Text;
 
 namespace MarkovChains
 {
-	public class MarkovDeserializer
+	public static class MarkovDeserializer
 	{
 		public struct FileHeader
 		{
@@ -13,19 +13,19 @@ namespace MarkovChains
 			public Int32 Version;
 		}
 
-		public FileHeader ReadHeader ( BinaryReader br )
+		public static FileHeader ReadHeader ( BinaryReader br )
 		{
 			var header = new FileHeader
 			{
 				IsValid = br.ReadString ( ) == "MARKOV",
 				Version = br.ReadInt32 ( )
 			};
-			header.IsValid = header.IsValid && header.Version == 4;
+			header.IsValid = header.IsValid && header.Version == 5;
 
 			return header;
 		}
 
-		public MarkovChain Deserialize ( Stream stream )
+		public static MarkovChain Deserialize ( Stream stream )
 		{
 			using ( var br = new BinaryReader ( stream, Encoding.UTF8, true ) )
 			{
@@ -35,21 +35,40 @@ namespace MarkovChains
 
 				var chain = new MarkovChain ( );
 
-				var wordcount = br.ReadInt32 ( );
-				while ( wordcount-- > 0 )
+				// Read word dictionary
+				var wordlist = new String[br.ReadInt32 ( )];
+				for ( var i = 0 ; i < wordlist.Length ; i++ )
+					wordlist[i] = br.ReadString ( );
+
+				// Read sentence intiators
+				var initiatorCount = br.ReadInt32 ( );
+				while ( initiatorCount-- > 0 )
 				{
-					var key = br.ReadString ( );
-					var sentencecount = br.ReadInt32 ( );
-					chain.SubSentences[key] = new List<String[]> ( sentencecount );
+					// Read each word by it's index
+					chain.SentenceInitiators.Add ( wordlist[br.ReadInt32 ( )] );
+				}
 
-					while ( sentencecount-- > 0 )
+				// Read the (word, sub-sentences) pairs
+				var pairCount = br.ReadInt32 ( );
+				while ( pairCount-- > 0 )
+				{
+					// Read the word by it's index
+					var word = wordlist[br.ReadInt32 ( )];
+
+					// Read the sub-sentences
+					var subsentenceCount = br.ReadInt32 ( );
+					chain.SubSentences[word] = new List<String[]> ( subsentenceCount );
+					while ( subsentenceCount-- > 0 )
 					{
-						var sentencelength = br.ReadInt32 ( );
-						var sentence = new String[sentencelength];
-						for ( var i = 0 ; i < sentencelength ; i++ )
-							sentence[i] = br.ReadString ( );
+						var subsentence = new String[br.ReadInt32 ( )];
+						for ( var i = 0 ; i < subsentence.Length ; i++ )
+						{
+							// Read each word of the sub-sentence
+							// by their indexes
+							subsentence[i] = wordlist[br.ReadInt32 ( )];
+						}
 
-						chain.SubSentences[key].Add ( sentence );
+						chain.SubSentences[word].Add ( subsentence );
 					}
 				}
 
