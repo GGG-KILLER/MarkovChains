@@ -87,8 +87,13 @@ namespace MarkovConsole
                     }
                     else if ( data.Trim ( ) != "" )
                     {
+                        Console.WriteLine ( data );
                         Console.WriteLine ( chain.Generate ( data, 2, Int32.MaxValue ) );
                     }
+                }
+                else if ( !String.IsNullOrWhiteSpace ( data ) )
+                {
+                    Console.WriteLine ( chain.Generate ( data ) );
                 }
                 else
                 {
