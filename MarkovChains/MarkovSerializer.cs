@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 
@@ -32,6 +33,18 @@ namespace MarkovChains
                             wordlist[word] = i++;
             }
             return wordlist;
+        }
+
+        public static void SerializeGzip ( MarkovChain chain, Stream stream, CompressionLevel level = CompressionLevel.Optimal )
+        {
+            using ( var gz = new GZipStream ( stream, level, true ) )
+                Serialize ( chain, gz );
+        }
+
+        public static void SerializeDeflate ( MarkovChain chain, Stream stream, CompressionLevel level = CompressionLevel.Optimal )
+        {
+            using ( var def = new DeflateStream ( stream, level, true ) )
+                Serialize ( chain, def );
         }
 
         public static void Serialize ( MarkovChain chain, Stream stream )

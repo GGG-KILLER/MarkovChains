@@ -6,9 +6,9 @@ namespace MarkovChains
 {
     public class MarkovChain
     {
-        internal readonly Dictionary<String, List<String[]>> SubSentences = new Dictionary<String, List<String[]>> ( );
-        internal readonly List<String> SentenceInitiators = new List<String> ( );
-        private readonly Random rand = new Random ( );
+        internal Dictionary<String, List<String[]>> SubSentences = new Dictionary<String, List<String[]>> ( );
+        internal List<String> SentenceInitiators = new List<String> ( );
+        private Random rand = new Random ( );
 
         public IEnumerable<String> Initiators => this.SentenceInitiators.AsReadOnly ( );
 
@@ -115,17 +115,17 @@ namespace MarkovChains
                 // Then return the subsentence should we find it
                 return subsentence;
 
-            end:;
+                end:;
             }
 
             return null;
         }
 
         /// <summary>
-        /// Picks a
+        /// Picks a random sentence initiator (for starting words)
         /// </summary>
         /// <returns></returns>
-        private String GetRandomSentenceInitiator ( )
+        public String GetRandomSentenceInitiator ( )
         {
             lock ( this.rand )
                 return this.SentenceInitiators[this.rand.Next ( this.SentenceInitiators.Count )];
