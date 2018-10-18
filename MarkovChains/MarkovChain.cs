@@ -1,39 +1,42 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 
 namespace MarkovChains
 {
-    public class MarkovChain
+    public class MarkovChain : ISerializable
     {
-        internal Dictionary<String, List<String[]>> SubSentences = new Dictionary<String, List<String[]>> ( );
-        internal List<String> SentenceInitiators = new List<String> ( );
-        private Random rand = new Random ( );
+        internal readonly Dictionary<String, List<String[]>> SubSentences = new Dictionary<String, List<String[]>> ( );
+        internal readonly List<String> SentenceInitiators = new List<String> ( );
+        private readonly Random rand;
 
-        public IEnumerable<String> Initiators => this.SentenceInitiators.AsReadOnly ( );
+        public IReadOnlyList<String> Initiators => this.SentenceInitiators;
+
+        public MarkovChain ( )
+        {
+            this.rand = new Random ( );
+        }
+
+        public MarkovChain ( Int32 seed )
+        {
+            this.rand = new Random ( seed );
+        }
 
         public void Learn ( String sentence )
         {
-            String[] words = sentence.Split ( new[] { ' ', '\n', '\r', '\t' } )
+            var words = sentence.Split ( new[] { ' ', '\n', '\r', '\t' } )
                 .Where ( str => !String.IsNullOrWhiteSpace ( str ) )
                 .ToArray ( );
-            var set = false;
 
+            this.SentenceInitiators.Add ( words[0] );
             while ( words.Length > 2 )
             {
                 // Work with pairs of first word of subsentence
                 // and remaining words of the subsentence
-                String current = words[0];
-                String[] subsentence = words.Skip ( 1 ).ToArray ( );
+                var current = words[0];
+                var subsentence = words.Skip ( 1 ).ToArray ( );
                 words = subsentence;
-
-                // So that we only get the actual sentence
-                // initiator, use a flag
-                if ( !set )
-                {
-                    set = true;
-                    this.SentenceInitiators.Add ( current );
-                }
 
                 // Create the subsentence list should it not exist
                 if ( !this.SubSentences.ContainsKey ( current ) )
@@ -42,6 +45,10 @@ namespace MarkovChains
                 this.SubSentences[current].Add ( subsentence );
             }
         }
+
+        #region Generating
+
+        #region Helpers
 
         private String[] PickNextSubSentence ( String Current )
         {
@@ -88,7 +95,7 @@ namespace MarkovChains
 
             // If we're dealing with a sentence then do our work
             if ( words.Length == 1 )
-                return PickNextSubSentence ( words[0] );
+                return this.PickNextSubSentence ( words[0] );
 
             // Get the list of subsentences that start with the
             // first word in our sentence
@@ -98,7 +105,7 @@ namespace MarkovChains
             // the rest of the sentence
             words = words.Skip ( 1 ).ToArray ( );
 
-            foreach ( String[] subsentence in subsentences )
+            foreach ( var subsentence in subsentences )
             {
                 // If the sub-sentence
                 if ( subsentence.Length < words.Length )
@@ -131,17 +138,14 @@ namespace MarkovChains
                 return this.SentenceInitiators[this.rand.Next ( this.SentenceInitiators.Count )];
         }
 
-        #region Generating
+        #endregion Helpers
 
         /// <summary>
         /// Generates a random sentence picking a random starting
         /// word (defaults to depth 2 and 40 words at max)
         /// </summary>
         /// <returns></returns>
-        public String Generate ( )
-        {
-            return Generate ( GetRandomSentenceInitiator ( ) );
-        }
+        public String Generate ( ) => this.Generate ( this.GetRandomSentenceInitiator ( ) );
 
         /// <summary>
         /// Generates a sentence using <paramref name="start" />
@@ -149,10 +153,7 @@ namespace MarkovChains
         /// </summary>
         /// <param name="start">Start of the sentence</param>
         /// <returns></returns>
-        public String Generate ( String start )
-        {
-            return Generate ( start, 2 );
-        }
+        public String Generate ( String start ) => this.Generate ( start, 2 );
 
         /// <summary>
         /// Generates a sentence using <paramref name="start" />
@@ -162,10 +163,7 @@ namespace MarkovChains
         /// <param name="start">Start of the sentence</param>
         /// <param name="depth">Markov depth</param>
         /// <returns></returns>
-        public String Generate ( String start, Int32 depth )
-        {
-            return Generate ( start, depth, 40 );
-        }
+        public String Generate ( String start, Int32 depth ) => this.Generate ( start, depth, 40 );
 
         /// <summary>
         /// Generates a sentence with <paramref name="depth" />
@@ -194,10 +192,10 @@ namespace MarkovChains
             if ( start.Contains ( ' ' ) )
             {
                 // Add all words of the starting sentence from this
-                String[] words = start.Split ( new[] { ' ' } );
+                var words = start.Split ( new[] { ' ' } );
                 sentence.AddRange ( words );
 
-                String[] piece = GetSubSentenceByWords ( words, depth );
+                var piece = this.GetSubSentenceByWords ( words, depth );
                 // Generate the first part only if there is any
                 // known sentences with this sub-sentence
                 if ( piece != null )
@@ -224,7 +222,7 @@ namespace MarkovChains
             while ( len < maxLength )
             {
                 // Pick next sentence piece
-                String[] piece = this.PickNextSubSentence ( lastword );
+                var piece = this.PickNextSubSentence ( lastword );
 
                 // If it was a terminator word, just quit
                 if ( piece == null )
@@ -254,7 +252,7 @@ namespace MarkovChains
                 b.Append ( "\t" )
                     .AppendLine ( kv.Key )
                     .AppendLine ( "\t{" );
-                foreach ( String[] sentence in kv.Value )
+                foreach ( var sentence in kv.Value )
                 {
                     b.Append ( "\t\t" )
                         .AppendLine ( String.Join ( " ", sentence ) );
@@ -268,5 +266,23 @@ namespace MarkovChains
 
             Console.WriteLine ( $"Wrote {b.Length} bytes of data to the console in {sw.ElapsedMilliseconds}ms" );
         }
+
+        #region ISeralizable
+
+        // Deserialization
+        public MarkovChain ( SerializationInfo info, StreamingContext context )
+        {
+            this.SentenceInitiators = ( List<String> ) info.GetValue ( "initiators", typeof ( List<String> ) );
+            this.SubSentences = ( Dictionary<String, List<String[]>> ) info.GetValue ( "sub_sentences", typeof ( Dictionary<String, List<String[]>> ) );
+        }
+
+        // Seralization
+        public void GetObjectData ( SerializationInfo info, StreamingContext context )
+        {
+            info.AddValue ( "initiators", this.SentenceInitiators, typeof ( List<String> ) );
+            info.AddValue ( "sub_sentences", this.SubSentences, typeof ( Dictionary<String, List<String[]>> ) );
+        }
+
+        #endregion
     }
 }
