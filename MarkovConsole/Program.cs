@@ -2,21 +2,15 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Timers;
+using GUtils.CLI.Commands;
+using GUtils.Timing;
 using MarkovChains;
-using MarkovConsole.Commands;
 using Newtonsoft.Json;
 
 namespace MarkovConsole
 {
-    public enum SaveAlgos
-    {
-        Gzip,
-        Deflate,
-        None
-    }
-
     internal class Program
     {
         private static readonly Timer timer = new Timer
@@ -24,26 +18,45 @@ namespace MarkovConsole
             Interval = 500,
             AutoReset = true
         };
-
         private static MarkovChain chain;
         private static CommandManager commandManager;
 
+        private class StackingArea : TimingArea
+        {
+            private static readonly Stack<StackingArea> areas = new Stack<StackingArea> ( );
+
+            public StackingArea ( String name, TimingArea parent = null ) : base ( name, parent ?? ( areas.Count > 0 ? areas.Peek ( ) : null ) )
+            {
+            }
+
+            public override void Dispose ( )
+            {
+                base.Dispose ( );
+                if ( areas.Pop ( ) != this )
+                    throw new Exception ( "Popped area that wasn't at the top of the stack." );
+            }
+        }
+
         private static void Main ( )
         {
+            // Initialize the command manager
             commandManager = new CommandManager ( );
-            commandManager.LoadCommands ( typeof ( Program ) );
+            commandManager.LoadCommands<Program> ( null );
+            commandManager.AddHelpCommand ( );
 
-            chain = new MarkovChain ( );
+            // Timer to save me from myself :v
             timer.Elapsed += Timer_Elapsed;
             timer.Start ( );
 
+            chain = new MarkovChain ( );
             while ( true )
             {
                 Console.Write ( "markov> " );
                 var line = Console.ReadLine ( );
                 try
                 {
-                    commandManager.Execute ( line );
+                    using ( new StackingArea ( $"executing: {line}" ) )
+                        commandManager.Execute ( line );
                 }
                 catch ( Exception e )
                 {
@@ -54,150 +67,82 @@ namespace MarkovConsole
             }
         }
 
-        private const Double TicksPerMicrosecond = TimeSpan.TicksPerMillisecond / 1000D;
-
-        public static String HumanTime ( Stopwatch sw )
-        {
-            return sw.ElapsedTicks > TimeSpan.TicksPerMinute
-                ? $"{sw.Elapsed.TotalMinutes:#00.00}m"
-                : sw.ElapsedTicks > TimeSpan.TicksPerSecond
-                    ? $"{sw.Elapsed.TotalSeconds:#00.00}s"
-                    : sw.ElapsedTicks > TimeSpan.TicksPerMillisecond
-                        ? $"{sw.Elapsed.TotalMilliseconds:#00.00}ms"
-                        : $"{sw.ElapsedTicks / TicksPerMicrosecond:#00.00}μs";
-        }
-
-        [Command ( "load" )]
-        private static void Load ( String path, SaveAlgos algo = SaveAlgos.None )
+        [Command ( "load" ), Command ( "deserialize" )]
+        [RawInput]
+        public static void Load ( String path )
         {
             if ( !File.Exists ( path ) )
                 throw new FileNotFoundException ( "File not found." );
 
+            using ( new StackingArea ( "Deserialization" ) )
             using ( FileStream stream = File.OpenRead ( path ) )
             {
-                var sw = Stopwatch.StartNew ( );
-                try
-                {
-                    switch ( algo )
-                    {
-                        case SaveAlgos.Deflate:
-                            chain = MarkovDeserializer.DeserializeDeflate ( stream );
-                            break;
-
-                        case SaveAlgos.Gzip:
-                            chain = MarkovDeserializer.DeserializeGzip ( stream );
-                            break;
-
-                        case SaveAlgos.None:
-                            chain = MarkovDeserializer.Deserialize ( stream );
-                            break;
-                    }
-                }
-                finally
-                {
-                    sw.Stop ( );
-                    Console.WriteLine ( $"Time elapsed on loading: {HumanTime ( sw )}" );
-                }
+                var formatter = new BinaryFormatter ( );
+                var deserialized = formatter.Deserialize ( stream );
+                if ( !( deserialized is MarkovChain ) )
+                    throw new InvalidDataException ( "Data deserialized is not a markov chain." );
+                chain = ( MarkovChain ) deserialized;
             }
         }
 
-        [Command ( "save" )]
-        private static void Save ( String path, SaveAlgos algo = SaveAlgos.None, CompressionLevel level = CompressionLevel.Fastest )
+        [Command ( "save" ), Command ( "serialize" )]
+        [RawInput]
+        private static void Save ( String path )
         {
             if ( File.Exists ( path ) )
                 File.Delete ( path );
 
+            using ( new StackingArea ( "Serialization" ) )
             using ( FileStream stream = File.OpenWrite ( path ) )
             {
-                var sw = Stopwatch.StartNew ( );
-                try
+                var formatter = new BinaryFormatter ( );
+                formatter.Serialize ( stream, chain );
+            }
+        }
+
+        [Command ( "gen" ), Command ( "generate" )]
+        private static void Generate ( String start = null, Int32 depth = 2, Int32 maxLen = 40 )
+        {
+            if ( String.IsNullOrWhiteSpace ( start ) )
+                start = null;
+
+            using ( new StackingArea ( "Generating sentence" ) )
+                Console.WriteLine ( start != null ? chain.Generate ( start, depth, maxLen ) : chain.Generate ( ) );
+        }
+
+        [Command ( "learn" ), Command ( "learnfrom" )]
+        [RawInput]
+        private static void LearnFile ( String pattern )
+        {
+            pattern = pattern.Trim ( );
+            
+            var sentences = new List<String> ( );
+            using ( new StackingArea ( "File processing" ) )
+            {
+                foreach ( FileInfo file in new DirectoryInfo ( "." ).EnumerateFiles ( pattern ) )
                 {
-                    switch ( algo )
+                    using ( var reader = new StreamReader ( file.OpenRead ( ) ) )
                     {
-                        case SaveAlgos.Deflate:
-                            MarkovSerializer.SerializeDeflate ( chain, stream, level );
-                            break;
+                        switch ( file.Extension )
+                        {
+                            case ".json":
+                                sentences.AddRange ( JsonConvert.DeserializeObject<String[]> ( reader.ReadToEnd ( ) ) );
+                                break;
 
-                        case SaveAlgos.Gzip:
-                            MarkovSerializer.SerializeGzip ( chain, stream, level );
-                            break;
-
-                        case SaveAlgos.None:
-                            MarkovSerializer.Serialize ( chain, stream );
-                            break;
+                            default:
+                                while ( !reader.EndOfStream )
+                                    sentences.Add ( reader.ReadLine ( ) );
+                                break;
+                        }
                     }
                 }
-                finally
-                {
-                    sw.Stop ( );
-                    Console.WriteLine ( $"Time elapsed on saving: {HumanTime ( sw )}" );
-                }
-            }
-        }
-
-        [Command ( "generate" )]
-        private static void Generate ( String start = null, Int32 depth = 2, Int32 maxLen = Int32.MaxValue )
-        {
-            var sw = Stopwatch.StartNew();
-            try
-            {
-                Console.WriteLine ( start != null ? chain.Generate ( start, depth, maxLen ) : chain.Generate ( ) );
-            }
-            finally
-            {
-                sw.Stop ( );
-                Console.WriteLine ( $"Time elapsed on generating: {HumanTime ( sw )}" );
-            }
-        }
-
-        [Command ( "learnfile" )]
-        private static void LearnFile ( String path )
-        {
-            path = path.Trim ( );
-
-            String[] sentences;
-            var sw = Stopwatch.StartNew();
-            try
-            {
-                switch ( Path.GetExtension ( path ) )
-                {
-                    case ".json":
-                        sentences = JsonConvert.DeserializeObject<String[]> ( File.ReadAllText ( path ) );
-                        break;
-
-                    default:
-                        var lines = new List<String> ( );
-                        foreach ( var file in Directory.EnumerateFiles ( ".", path.Trim ( ) ) )
-                        {
-                            Console.WriteLine ( $"Reading from {file}" );
-                            lines.AddRange ( File.ReadAllLines ( file ) );
-                        }
-
-                        sentences = lines.ToArray ( );
-                        if ( sentences.Length < 1 )
-                        {
-                            Console.WriteLine ( "No files found or all files were empty." );
-                        }
-                        break;
-                }
-            }
-            finally
-            {
-                sw.Stop ( );
-                Console.WriteLine ( $"Time elapsed on reading the data: {HumanTime ( sw )}" );
             }
 
-            sw = Stopwatch.StartNew ( );
-            try
+            using ( new StackingArea ( "Learning all files/lines" ) )
             {
                 chain = new MarkovChain ( );
-                foreach ( String sentence in sentences )
+                foreach ( var sentence in sentences )
                     chain.Learn ( sentence );
-            }
-            finally
-            {
-                sw.Stop ( );
-                Console.WriteLine ( $"Time elapsed learning file(s): {HumanTime ( sw )}" );
             }
         }
 
