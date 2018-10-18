@@ -6,6 +6,7 @@ using System.Text;
 
 namespace MarkovChains
 {
+    [Obsolete ( "MarkovChain now implements ISerializable, please use that instead." )]
     public static class MarkovDeserializer
     {
         public struct FileHeader
