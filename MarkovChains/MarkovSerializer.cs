@@ -2,7 +2,6 @@
 
 namespace MarkovChains
 {
-    [Obsolete("MarkovChain now implements ISerializable, please use that instead.")]
     public class MarkovSerializer
     {
         protected static Dictionary<string, int> CreateWordLookupTable(Dictionary<string, List<string[]>> dictionary)

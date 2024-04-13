@@ -1,12 +1,9 @@
-﻿using System.Runtime.Serialization;
-
-namespace MarkovChains
+﻿namespace MarkovChains
 {
-    [Serializable]
-    public class MarkovChain : ISerializable
+    public class MarkovChain
     {
-        internal readonly Dictionary<string, List<string[]>> SubSentences = new Dictionary<string, List<string[]>>();
-        internal readonly List<string> SentenceInitiators = new List<string>();
+        internal readonly Dictionary<string, List<string[]>> SubSentences = [];
+        internal readonly List<string> SentenceInitiators = [];
         [NonSerialized]
         private readonly Random _rand;
 
@@ -35,7 +32,7 @@ namespace MarkovChains
                 // Create the subsentence list should it not exist
                 if (!SubSentences.TryGetValue(current, out List<string[]> list))
                 {
-                    list = new List<string[]>();
+                    list = [];
                     SubSentences[current] = list;
                 }
 
@@ -47,7 +44,7 @@ namespace MarkovChains
 
         #region Helpers
 
-        private string[] PickNextSubSentence(string current)
+        private string[]? PickNextSubSentence(string current)
         {
             List<string[]> cand;
 
@@ -84,7 +81,7 @@ namespace MarkovChains
         /// <param name="words">The words to use when searching</param>
         /// <param name="depth">The depth we're working with</param>
         /// <returns></returns>
-        private string[] GetSubSentenceByWords(string[] words, int depth)
+        private string[]? GetSubSentenceByWords(string[] words, int depth)
         {
             // If we have more words than needed, skip the ones we won't use
             if (words.Length > depth)
@@ -274,24 +271,5 @@ namespace MarkovChains
 
             Console.WriteLine($"Wrote {b.Length} bytes of data to the console in {sw.ElapsedMilliseconds}ms");
         }
-
-        #region ISeralizable
-
-        // Deserialization
-        public MarkovChain(SerializationInfo info, StreamingContext context)
-        {
-            _rand = new Random();
-            SentenceInitiators = (List<string>) info.GetValue("initiators", typeof(List<string>));
-            SubSentences = (Dictionary<string, List<string[]>>) info.GetValue("sub_sentences", typeof(Dictionary<string, List<string[]>>));
-        }
-
-        // Seralization
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("initiators", SentenceInitiators, typeof(List<string>));
-            info.AddValue("sub_sentences", SubSentences, typeof(Dictionary<string, List<string[]>>));
-        }
-
-        #endregion ISeralizable
     }
 }

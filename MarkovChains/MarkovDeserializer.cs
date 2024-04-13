@@ -3,7 +3,6 @@ using System.Text;
 
 namespace MarkovChains
 {
-    [Obsolete("MarkovChain now implements ISerializable, please use that instead.")]
     public static class MarkovDeserializer
     {
         public struct FileHeader
@@ -85,8 +84,6 @@ namespace MarkovChains
                     }
                 }
 
-                for (var i = 0; i < wordlist.Length; i++)
-                    wordlist[i] = null;
                 return chain;
             }
         }
