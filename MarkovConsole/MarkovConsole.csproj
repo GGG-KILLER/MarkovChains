@@ -2,14 +2,17 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
-    <CodeAnalysisRuleSet>ruleset.ruleset</CodeAnalysisRuleSet>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="GUtils.CLI" Version="2.0.1" />
-    <PackageReference Include="GUtils.Timing" Version="2.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+    <!-- <PackageReference Include="Tsu.CLI" Version="2.2.1" />
+    <PackageReference Include="Tsu.Timing" Version="2.2.1" /> -->
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+    <PackageReference Include="Tsu" Version="2.2.2" />
+    <PackageReference Include="Tsu.CLI" Version="10.0.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,5 +23,12 @@
     <None Update="samples\bee-movie.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="samples\kittixdump.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="samples\kittix_filtered.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
+
 </Project>
