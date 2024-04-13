@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.IO.Compression;
+using System.Text.Json;
 using System.Timers;
 using MarkovChains;
-using Newtonsoft.Json;
 using Tsu.CLI.Commands;
 using Tsu.Timing;
 
@@ -49,11 +49,10 @@ namespace MarkovConsole
 
             using (s_timingLogger.BeginOperation("Deserialization"))
             using (FileStream stream = File.OpenRead(path))
+            using (var gzipStream = new GZipStream(stream, CompressionMode.Decompress))
             {
-                var deserialized = new BinaryFormatter().Deserialize(stream);
-                if (deserialized is not MarkovChain)
-                    throw new InvalidDataException("Data deserialized is not a markov chain.");
-                s_chain = (MarkovChain) deserialized;
+                s_chain = MarkovDeserializer.Deserialize(stream)
+                    ?? throw new InvalidDataException("Data deserialized is not a markov chain.");
             }
         }
 
@@ -66,7 +65,8 @@ namespace MarkovConsole
 
             using (s_timingLogger.BeginOperation("Serialization"))
             using (FileStream stream = File.OpenWrite(path))
-                new BinaryFormatter().Serialize(stream, s_chain);
+            using (var gzipStream = new GZipStream(stream, CompressionLevel.SmallestSize))
+                MarkovSerializer.Serialize(s_chain, gzipStream);
         }
 
         [Command("gen"), Command("generate")]
@@ -95,7 +95,7 @@ namespace MarkovConsole
                     switch (file.Extension)
                     {
                         case ".json":
-                            sentences.AddRange(JsonConvert.DeserializeObject<string[]>(reader.ReadToEnd()));
+                            sentences.AddRange(JsonSerializer.Deserialize<string[]>(reader.ReadToEnd())!);
                             break;
 
                         default:
