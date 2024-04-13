@@ -21,7 +21,7 @@
 
         public void Learn(string sentence)
         {
-            var words = new Queue<string>(sentence.Split(new[] { ' ', '\n', '\r', '\t' }).Where(str => !string.IsNullOrWhiteSpace(str)));
+            var words = new Queue<string>(sentence.Split([' ', '\n', '\r', '\t']).Where(str => !string.IsNullOrWhiteSpace(str)));
 
             SentenceInitiators.Add(words.Peek());
             while (words.Count > 2)
@@ -36,7 +36,7 @@
                     SubSentences[current] = list;
                 }
 
-                list.Add(words.ToArray());
+                list.Add([.. words]);
             }
         }
 
@@ -191,7 +191,7 @@
             if (start.Contains(' '))
             {
                 // Add all words of the starting sentence from this
-                var words = start.Split(new[] { ' ' });
+                var words = start.Split([' ']);
                 sentence.AddRange(words);
 
                 var piece = GetSubSentenceByWords(words, depth);
